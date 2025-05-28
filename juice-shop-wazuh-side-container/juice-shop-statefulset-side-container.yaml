@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wazuh-agent-nodejs-website
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wazuh-authd-pass
+  namespace: wazuh-agent-nodejs-website
+data:
+  authd.pass: cGFzc3dvcmQ= # string "password" base64 encoded
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: longhorn-wazuh-agent-nodejs-website-storage
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "3"
+  staleReplicaTimeout: "2880" # 48 hours in minutes
+  fromBackup: ""
+  dataLocality: best-effort
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-data-pvc
+  namespace: wazuh-agent-nodejs-website
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: longhorn-wazuh-agent-nodejs-website-storage
+  resources:
+    requests:
+      storage: 5Gi
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: longhorn-wazuh-agent-data-storage
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "1"
+  staleReplicaTimeout: "2880" # 48 hours in minutes
+  fromBackup: ""
+  dataLocality: "best-effort"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nodejs-website-wazuh-agent
+  namespace: wazuh-agent-nodejs-website
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodejs-website-wazuh-agent
+  template:
+    metadata:
+      labels:
+        app: nodejs-website-wazuh-agent
+    spec:
+      hostname: nodejs-website-wazuh-agent
+      containers:
+        - name: wazuh-agent
+          image: matteodalgrande/wazuh-agent-frontend:1.2.21
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: true
+            capabilities:
+              add: ["SETGID", "SETUID"]
+          volumeMounts:
+            - name: wazuh-authd-pass
+              mountPath: /var/ossec/etc/authd.pass
+              subPath: authd.pass
+              readOnly: true
+            - name: shared-data
+              mountPath: /application/
+              readOnly: true
+            - name: wazuh-agent-data
+              mountPath: /var/ossec
+        - name: nodejs-website
+          image: matteodalgrande/nodejs-website:1.0.6
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+          volumeMounts:
+            - name: shared-data
+              mountPath: /application
+              readOnly: false
+      volumes:
+        - name: wazuh-authd-pass
+          secret:
+            secretName: wazuh-authd-pass
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: shared-data-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: wazuh-agent-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "longhorn-wazuh-agent-data-storage"
+      resources:
+        requests:
+          storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-website
+  namespace: wazuh-agent-nodejs-website
+spec:
+  selector:
+    app: nodejs-website-wazuh-agent
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+      nodePort: 30010
+  type: NodePort
