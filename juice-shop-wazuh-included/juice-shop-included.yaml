@@ -31,7 +31,7 @@ metadata:
   name: juice-shop-wazuh-agent
   namespace: juice-shop-wazuh-included
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: juice-shop-wazuh-agent
