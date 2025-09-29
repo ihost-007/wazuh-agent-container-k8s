@@ -30,7 +30,7 @@ fi
 if [ ! -f "/var/ossec/bin/wazuh-control" ]; then
     echo "Wazuh agent not found. Installing..."
     apt update && \
-    JOIN_MANAGER_API_PORT="55000" WAZUH_MANAGER="wazuh-workers.wazuh.svc.cluster.local" WAZUH_MANAGER_PORT="1514" WAZUH_REGISTRATION_SERVER="wazuh.wazuh.svc.cluster.local" WAZUH_REGISTRATION_PORT="1515" WAZUH_REGISTRATION_PASSWORD="password" apt install -y wazuh-agent=4.10.1-1
+    JOIN_MANAGER_API_PORT="55000" WAZUH_MANAGER="wazuh-workers.wazuh.svc.cluster.local" WAZUH_MANAGER_PORT="1514" WAZUH_REGISTRATION_SERVER="wazuh.wazuh.svc.cluster.local" WAZUH_REGISTRATION_PORT="1515" WAZUH_REGISTRATION_PASSWORD="password" apt install -y wazuh-agent=4.13.0
 
     # Ensure the authentication password is set
     if [ -f "/var/ossec/etc/authd.pass" ]; then
